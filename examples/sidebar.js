@@ -135,28 +135,141 @@ export default function () {
   ]
 ]
 
-  const sidebarHtml = routes.map(route => `
-    <div style="padding: 10px;background-color: ${document.querySelector('title').textContent === route[0] ? 'rgb(66,66,66)' : ''};">
-      <a style="color: #fff;" href="${route[1]}">${route[0]}</a>
-    </div>
-  `).join('\n')
+  injectGalleryStyles()
 
   const rootCont = document.createElement('div')
-  rootCont.style.display = 'flex'
-  rootCont.style.flexDirection = 'row'
-  rootCont.style.gap = '2px'
-  rootCont.style.width = '100%'
-  rootCont.style.height = '100%'
+  rootCont.className = 'f3-gallery-root'
   document.body.appendChild(rootCont)
 
-  const sideCont = document.createElement('div')
-  sideCont.style = 'width: 300px; height: 90vh; background-color: rgb(33,33,33); color: #fff; overflow-y: auto;'
-  rootCont.appendChild(sideCont)
+  // Far-left icon rail. The menu is auto-hidden by default; clicking an icon
+  // pops open its panel. Add more entries to `menus` to get more rail icons,
+  // each opening its own left-side menu.
+  const rail = document.createElement('div')
+  rail.className = 'f3-gallery-rail'
+  rootCont.appendChild(rail)
 
-  const cont = document.querySelector("#FamilyChart")
+  // Collapsible panel that holds the active menu's content.
+  const panel = document.createElement('div')
+  panel.className = 'f3-gallery-panel'
+  const panelInner = document.createElement('div')
+  panelInner.className = 'f3-gallery-panel-inner'
+  panel.appendChild(panelInner)
+  rootCont.appendChild(panel)
+
+  const cont = document.querySelector('#FamilyChart')
   cont.style.height = '90vh'
+  cont.classList.add('f3-gallery-chart')
   rootCont.appendChild(cont)
 
-  sideCont.innerHTML = sidebarHtml
+  // Menu registry — extensible. Each menu gets a rail icon and a panel view.
+  const menus = [
+    { id: 'examples', title: 'Examples', icon: GALLERY_ICONS.list, render: renderExamplesMenu },
+  ]
+
+  // Remember the open menu across page navigations (examples reload the page).
+  // Defaults to closed (auto-hidden) on first visit.
+  const STORAGE_KEY = 'f3-gallery-open-menu'
+  let open_id = readOpenId()
+
+  const rail_buttons = {}
+  menus.forEach(menu => {
+    const btn = document.createElement('button')
+    btn.className = 'f3-gallery-rail-btn'
+    btn.title = menu.title
+    btn.setAttribute('aria-label', menu.title)
+    btn.innerHTML = menu.icon
+    btn.addEventListener('click', () => toggle(menu.id))
+    rail.appendChild(btn)
+    rail_buttons[menu.id] = btn
+  })
+
+  update()
+
+  function toggle(id) {
+    open_id = open_id === id ? null : id
+    try { localStorage.setItem(STORAGE_KEY, open_id || '') } catch (e) { /* ignore */ }
+    update()
+  }
+
+  function update() {
+    const menu = menus.find(m => m.id === open_id)
+    panelInner.innerHTML = ''
+    if (menu) {
+      const header = document.createElement('div')
+      header.className = 'f3-gallery-panel-header'
+      header.innerHTML = `<span>${menu.title}</span>`
+      const close_btn = document.createElement('button')
+      close_btn.className = 'f3-gallery-close'
+      close_btn.innerHTML = '&times;'
+      close_btn.title = 'Hide menu'
+      close_btn.addEventListener('click', () => toggle(menu.id))
+      header.appendChild(close_btn)
+      panelInner.appendChild(header)
+      panelInner.appendChild(menu.render())
+    }
+    panel.classList.toggle('open', !!menu)
+    Object.keys(rail_buttons).forEach(id => rail_buttons[id].classList.toggle('active', id === open_id))
+  }
+
+  function renderExamplesMenu() {
+    const current = document.querySelector('title') ? document.querySelector('title').textContent : ''
+    const list = document.createElement('div')
+    list.className = 'f3-gallery-list'
+    list.innerHTML = routes.map(route => `
+      <a class="f3-gallery-link${current === route[0] ? ' active' : ''}" href="${route[1]}">${route[0]}</a>
+    `).join('')
+    return list
+  }
+
+  function readOpenId() {
+    let id = null
+    try { id = localStorage.getItem(STORAGE_KEY) } catch (e) { /* ignore */ }
+    if (!id || !menus.some(m => m.id === id)) return null
+    return id
+  }
+}
+
+const GALLERY_ICONS = {
+  list: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>',
+}
+
+function injectGalleryStyles() {
+  if (document.getElementById('f3-gallery-styles')) return
+  const style = document.createElement('style')
+  style.id = 'f3-gallery-styles'
+  style.textContent = `
+    .f3-gallery-root { display: flex; flex-direction: row; width: 100%; height: 100%; }
+    .f3-gallery-rail {
+      flex: 0 0 auto; width: 48px; height: 90vh; background: rgb(24,24,24);
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      padding-top: 8px; z-index: 7;
+    }
+    .f3-gallery-rail-btn {
+      width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;
+      background: transparent; color: #bbb; border: none; border-radius: 8px; cursor: pointer;
+      transition: background .15s ease, color .15s ease;
+    }
+    .f3-gallery-rail-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+    .f3-gallery-rail-btn.active { background: #4CAF50; color: #fff; }
+    .f3-gallery-panel {
+      flex: 0 0 auto; width: 0; height: 90vh; background: rgb(33,33,33); color: #fff;
+      overflow: hidden; transition: width .2s ease; border-right: 1px solid rgba(255,255,255,0.08);
+    }
+    .f3-gallery-panel.open { width: 280px; }
+    .f3-gallery-panel-inner { width: 280px; height: 100%; overflow-y: auto; box-sizing: border-box; }
+    .f3-gallery-panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px; font-weight: bold; position: sticky; top: 0;
+      background: rgb(33,33,33); border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .f3-gallery-close { background: transparent; border: none; color: #bbb; font-size: 20px; line-height: 1; cursor: pointer; padding: 0 4px; }
+    .f3-gallery-close:hover { color: #fff; }
+    .f3-gallery-list { display: flex; flex-direction: column; }
+    .f3-gallery-link { color: #fff; text-decoration: none; padding: 10px 14px; border-left: 3px solid transparent; }
+    .f3-gallery-link:hover { background: rgb(66,66,66); }
+    .f3-gallery-link.active { background: rgb(66,66,66); border-left-color: #4CAF50; }
+    .f3-gallery-chart { flex: 1 1 0; min-width: 0; }
+  `
+  document.head.appendChild(style)
 }
   
