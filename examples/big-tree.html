@@ -1,0 +1,149 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Whole Family Tree</title>
+  <link rel="shortcut icon" type="image/svg" href="/examples/logo.svg">
+  <script src="https://unpkg.com/d3@7"></script>
+  <link rel="stylesheet" href="/src/styles/family-chart.css">
+  <style>
+    body { font-family: 'Arial', sans-serif; }
+    .bt-toolbar {
+      position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 10;
+      display: flex; align-items: center; gap: 10px; padding: 6px 12px; font-size: 13px;
+      background: rgba(20,20,20,0.9); color: #fff; border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+    }
+    .bt-search { position: relative; }
+    .bt-search input {
+      width: 200px; padding: 5px 8px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.2);
+      background: rgb(33,33,33); color: #fff;
+    }
+    .bt-dropdown {
+      position: absolute; top: 32px; left: 0; right: 0; max-height: 320px; overflow-y: auto;
+      background: rgb(20,20,20); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; z-index: 20;
+    }
+    .bt-dropdown div { padding: 7px 9px; cursor: pointer; border-bottom: .5px solid rgba(255,255,255,0.1); }
+    .bt-dropdown div:hover { background: rgb(50,50,50); }
+  </style>
+</head>
+<body>
+<div class="bt-toolbar">
+  <strong>🌳 Whole Family Tree</strong>
+  <span style="opacity:.7;">Click a person to center · search to find</span>
+  <div class="bt-search">
+    <input id="bt-search-input" type="text" placeholder="Search by name" autocomplete="off">
+    <div id="bt-dropdown" class="bt-dropdown" style="display:none;"></div>
+  </div>
+</div>
+
+<div id="FamilyChart" class="f3" style="width:100%;height:100vh;margin:auto;background-color:rgb(33,33,33);color:#fff;"></div>
+<script type="module">
+import f3 from '../src/index.js'
+
+// list of all examples. delete this if not needed
+import sidebar from './sidebar.js'
+sidebar()
+
+// Load the shared, saved family tree (same source as the builder). Falls back
+// to the default sample if the API is unavailable.
+fetch('/api/tree')
+  .then(res => { if (!res.ok) throw new Error('API ' + res.status); return res.json() })
+  .then(data => {
+    if (!Array.isArray(data) || data.length === 0) throw new Error('No saved data')
+    create(data)
+  })
+  .catch(err => {
+    console.error('Failed to load saved tree, using default:', err)
+    fetch('./data/data-first-node.json')
+      .then(res => res.json())
+      .then(data => create(data))
+      .catch(err2 => console.error(err2))
+  })
+
+function create(data) {
+  const f3Chart = f3.createChart('#FamilyChart', data)
+    .setTransitionTime(800)
+    .setCardXSpacing(210)
+    .setCardYSpacing(140)
+
+  const f3Card = f3Chart.setCardHtml()
+    .setCardDisplay([["first name", "last name"]])
+    .setCardDim({ h: 70 })
+    .setDefaultPersonIcon((d) => initialsAvatar(d.data.data || d.data))
+    .setOnCardUpdate(function (d) {
+      // custom label text showing the birthday (from v2/5-custom-text-display)
+      const p = d.data.data
+      const card_label = this.querySelector('.card-label')
+      if (!card_label) return
+      const name = [p['first name'], p['last name']].filter(Boolean).join(' ')
+      const bday = p['birthday'] ? `<div style="font-size:11px;opacity:.7;">b. ${esc(p['birthday'])}</div>` : ''
+      card_label.innerHTML = `<div>${esc(name)}</div>` + bday
+    })
+
+  // click a person to re-center the whole tree on them
+  f3Card.setOnCardClick((e, d) => centerOn(d.data.id))
+
+  // initial render fits the entire tree to the screen so you see everyone at once
+  f3Chart.updateTree({ initial: true })
+
+  function centerOn(person_id) {
+    f3Chart.updateMainId(person_id)
+    f3Chart.updateTree({})
+  }
+
+  // ---- search dropdown (adapted from v2/10-big-tree) ----
+  const input = document.querySelector('#bt-search-input')
+  const dropdown = document.querySelector('#bt-dropdown')
+  const options = []
+  data.forEach(d => {
+    const p = d.data
+    const label = [p['first name'], p['last name']].filter(Boolean).join(' ') || d.id
+    options.push({ label, value: d.id })
+  })
+
+  input.addEventListener('input', renderDropdown)
+  input.addEventListener('focus', renderDropdown)
+  input.addEventListener('blur', () => setTimeout(() => { dropdown.style.display = 'none' }, 200))
+
+  function renderDropdown() {
+    const q = input.value.toLowerCase()
+    const filtered = options.filter(o => o.label.toLowerCase().includes(q)).slice(0, 50)
+    dropdown.innerHTML = ''
+    filtered.forEach(o => {
+      const row = document.createElement('div')
+      row.textContent = o.label
+      row.addEventListener('mousedown', () => { centerOn(o.value); input.value = o.label; dropdown.style.display = 'none' })
+      dropdown.appendChild(row)
+    })
+    dropdown.style.display = filtered.length ? 'block' : 'none'
+  }
+}
+
+function initialsAvatar(p) {
+  const fn = (p['first name'] || '').trim(), ln = (p['last name'] || '').trim()
+  const initials = ((fn[0] || '') + (ln[0] || '')).toUpperCase() || '?'
+  const colors = p.gender === 'F' ? ['#f06292', '#ba68c8']
+    : p.gender === 'M' ? ['#4fc3f7', '#5c6bc0'] : ['#90a4ae', '#607d8b']
+  const id = 'g' + Math.random().toString(36).slice(2, 8)
+  return `
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="${colors[0]}"/><stop offset="1" stop-color="${colors[1]}"/>
+      </linearGradient></defs>
+      <rect width="100" height="100" fill="url(#${id})"/>
+      <text x="50" y="50" dy="0.35em" text-anchor="middle" fill="#fff"
+        font-family="Arial, sans-serif" font-size="38" font-weight="700">${initials}</text>
+    </svg>`
+}
+
+function esc(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+</script>
+</body>
+</html>

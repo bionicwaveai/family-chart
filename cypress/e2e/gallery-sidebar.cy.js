@@ -12,23 +12,23 @@ describe('Gallery sidebar (collapsible)', () => {
   })
 
   it('is auto-hidden by default with a rail icon to open it', () => {
-    cy.get('.f3-gallery-rail-btn').should('be.visible')
+    cy.get('.f3-gallery-rail-btn[title="Examples"]').should('be.visible')
     cy.get('.f3-gallery-panel').should('not.have.class', 'open')
     cy.get('.f3-gallery-link').should('not.exist')
   })
 
   it('pops open and closes the menu via the rail icon', () => {
-    cy.get('.f3-gallery-rail-btn').click()
+    cy.get('.f3-gallery-rail-btn[title="Examples"]').click()
     cy.get('.f3-gallery-panel').should('have.class', 'open')
     cy.get('.f3-gallery-link').should('be.visible').and('have.length.at.least', 5)
 
-    cy.get('.f3-gallery-rail-btn').click()
+    cy.get('.f3-gallery-rail-btn[title="Examples"]').click()
     cy.get('.f3-gallery-panel').should('not.have.class', 'open')
     cy.get('.f3-gallery-link').should('not.exist')
   })
 
   it('remembers the open state across page navigation', () => {
-    cy.get('.f3-gallery-rail-btn').click()
+    cy.get('.f3-gallery-rail-btn[title="Examples"]').click()
     cy.get('.f3-gallery-panel').should('have.class', 'open')
     cy.reload()
     cy.get('.f3-gallery-panel').should('have.class', 'open')
@@ -36,7 +36,7 @@ describe('Gallery sidebar (collapsible)', () => {
 
   it('captures screenshots of the collapsed and open states', () => {
     cy.screenshot('gallery-collapsed', { capture: 'viewport' })
-    cy.get('.f3-gallery-rail-btn').click()
+    cy.get('.f3-gallery-rail-btn[title="Examples"]').click()
     cy.wait(400)
     cy.screenshot('gallery-open', { capture: 'viewport' })
   })
