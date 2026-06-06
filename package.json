@@ -54,8 +54,14 @@
   },
   "sideEffects": false,
   "dependencies": {
+    "@google-cloud/storage": "^7.19.0",
+    "@uppy/aws-s3": "^5.0.0",
+    "@uppy/core": "^5.0.0",
+    "@uppy/dashboard": "^5.0.0",
+    "@uppy/react": "^5.0.0",
     "d3": "^7.9.0",
     "express": "^5.2.1",
+    "google-auth-library": "^10.7.0",
     "pg": "^8.21.0"
   },
   "devDependencies": {

@@ -1,1 +1,2 @@
 - [Express 5 wildcard routes](express5-routing.md) — Express 5 rejects bare `'*'` route; use `express.static` or `/*splat`, not `app.get('*')`.
+- [Relative paths break url inputs](avatar-relative-path-url-input.md) — fields holding relative upload paths must be type=text; requestSubmit() validation silently blocks type=url, so nothing saves.

@@ -18,6 +18,13 @@ A D3.js-based JavaScript library for creating beautiful, interactive family tree
 - **Whole-tree overview**: `examples/big-tree.html` reads the same `/api/tree` data and renders the entire tree fit-to-screen (read-only, click a person to re-center, search by name). Reachable from the icon rail (the tree icon below the menu button, wired in `examples/sidebar.js`).
 - Single shared tree, last write wins. No auth, no per-user trees, no live multi-user sync (changes appear on next reload).
 
+## Profile photo upload (object storage)
+
+- **Storage**: Replit App Storage (Google Cloud Storage via the Replit sidecar). The default bucket and `PRIVATE_OBJECT_DIR` / `PUBLIC_OBJECT_SEARCH_PATHS` env vars are set by `setup_object_storage`. Uploaded photos are written under `<PRIVATE_OBJECT_DIR>/uploads/<uuid>` and served back publicly through the API (no auth — all photos are public).
+- **Backend** (`server/index.js`): `POST /api/uploads/request-url` validates an image content-type and 10MB max, then returns a presigned PUT `uploadURL` plus an `objectPath` of the form `/api/objects/uploads/<uuid>`. `GET /api/objects/uploads/:id` validates the uuid and streams the file back. Routes live under `/api` so the existing Vite proxy works in dev and prod.
+- **Frontend** (`examples/create-tree.html`): the edit form's avatar field has an "Upload photo" button + hidden file input. On selection it does the two-step upload (request-url → PUT bytes to storage), sets the avatar input to the returned `/api/objects/uploads/<uuid>` path, and calls `form.requestSubmit()` so the library commits the value and the normal autosave persists it.
+- The avatar field is `type: 'text'` (NOT `url`): uploaded photos are stored as **relative paths**, which fail native `<input type=url>` validation and would otherwise block form submit. The field still accepts a manually pasted full URL.
+
 ## Replit Setup
 
 - **Workflow** "Start application": `yarn dev` → runs the Express API (localhost:3001) and Vite (port 5000, host `0.0.0.0`) together via `concurrently`. Vite proxies `/api` → `http://localhost:3001`.

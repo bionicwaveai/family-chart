@@ -29,6 +29,17 @@
       width: 92px; height: 92px; border-radius: 50%; object-fit: cover;
       border: 2px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.06);
     }
+
+    /* "Upload photo" control under the avatar field */
+    .f3-avatar-upload { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+    .f3-avatar-upload-btn {
+      cursor: pointer; font-size: 13px; padding: 5px 12px; border-radius: 5px;
+      border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.08);
+      color: inherit;
+    }
+    .f3-avatar-upload-btn:hover { background: rgba(255,255,255,0.16); }
+    .f3-avatar-upload-btn:disabled { opacity: 0.5; cursor: default; }
+    .f3-avatar-upload-status { font-size: 12px; opacity: 0.75; }
   </style>
 </head>
 <body>
@@ -79,7 +90,7 @@ const FIELDS = [
   { type: 'text',     id: 'first name',  label: 'First Name' },
   { type: 'text',     id: 'last name',   label: 'Last Name' },
   { type: 'text',     id: 'maiden name', label: 'Maiden Name' },
-  { type: 'url',      id: 'avatar',      label: 'Profile Photo (URL)' },
+  { type: 'text',     id: 'avatar',      label: 'Profile Photo (upload below or paste URL)' },  // text, not url: uploaded photos are stored as relative paths (/api/objects/uploads/...) which fail native url validation and would block form submit
   { type: 'text',     id: 'birthday',    label: 'Birthday' },
   { type: 'text',     id: 'birth place', label: 'Birth Place' },
   { type: 'date',     id: 'death date',  label: 'Death Date' },
@@ -168,7 +179,9 @@ function addActionButton(card_inner, cls, icon_html, title, onClick) {
   card_inner.appendChild(btn)
 }
 
-// Live profile-photo preview added to the top of the edit form (from v2/19).
+// Live profile-photo preview added to the top of the edit form (from v2/19),
+// plus an "Upload photo" button that uploads a file from the user's device and
+// fills the avatar field with its URL.
 function addAvatarPreview({ cont, form_creator }) {
   if (!form_creator.editable) return
   const input = cont.querySelector('input[name="avatar"]')
@@ -187,6 +200,86 @@ function addAvatarPreview({ cont, form_creator }) {
   img.addEventListener('error', () => { preview.style.display = 'none' })
   input.addEventListener('input', render)
   render()
+
+  addUploadButton(input, render)
+}
+
+// Adds an "Upload photo" button + hidden file input below the avatar field.
+// On selection it uploads the file and writes the resulting URL into `input`.
+function addUploadButton(input, render) {
+  const field = input.closest('.f3-form-field')
+  const wrap = document.createElement('div')
+  wrap.className = 'f3-avatar-upload'
+
+  const fileInput = document.createElement('input')
+  fileInput.type = 'file'
+  fileInput.accept = 'image/*'
+  fileInput.style.display = 'none'
+
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = 'f3-avatar-upload-btn'
+  btn.textContent = 'Upload photo'
+
+  const status = document.createElement('span')
+  status.className = 'f3-avatar-upload-status'
+
+  wrap.append(btn, fileInput, status)
+  field.appendChild(wrap)
+
+  btn.addEventListener('click', () => fileInput.click())
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files && fileInput.files[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      status.textContent = 'Please choose an image file.'
+      fileInput.value = ''
+      return
+    }
+    btn.disabled = true
+    status.textContent = 'Uploading…'
+    try {
+      const url = await uploadPhoto(file)
+      input.value = url
+      render()
+      status.textContent = 'Uploaded ✓'
+      // The library only commits field values to its data model on form submit
+      // (it reads FormData from the form), and submitting is what triggers the
+      // autosave via setOnChange. Setting input.value alone is not persisted.
+      // The form is fixed, so submitting re-renders it in place instead of
+      // closing it. requestSubmit() works because the form has a submit button.
+      const form = input.closest('form')
+      if (form) form.requestSubmit()
+    } catch (err) {
+      console.error('Photo upload failed:', err)
+      status.textContent = err.message || 'Upload failed.'
+    } finally {
+      btn.disabled = false
+      fileInput.value = ''
+    }
+  })
+}
+
+// Two-step upload: ask the server for a presigned URL, then PUT the file bytes
+// straight to storage. Returns the path to store in the avatar field.
+async function uploadPhoto(file) {
+  const reqRes = await fetch('/api/uploads/request-url', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type })
+  })
+  if (!reqRes.ok) {
+    const body = await reqRes.json().catch(() => ({}))
+    throw new Error(body.error || 'Could not start upload')
+  }
+  const { uploadURL, objectPath } = await reqRes.json()
+  const putRes = await fetch(uploadURL, {
+    method: 'PUT',
+    headers: { 'Content-Type': file.type },
+    body: file
+  })
+  if (!putRes.ok) throw new Error('Upload to storage failed')
+  return objectPath
 }
 
 // Generated initials avatar shown when a person has no profile photo.
