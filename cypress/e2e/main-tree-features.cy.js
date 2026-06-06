@@ -22,7 +22,8 @@ describe('Main family tree (builder)', () => {
 
   it('has the v2/19 custom fields with native input types', () => {
     cy.get('form#familyForm').within(() => {
-      cy.get('input[name="avatar"]').should('have.attr', 'type', 'url')
+      // avatar is type=text (not url) so uploaded relative paths pass validation
+      cy.get('input[name="avatar"]').should('have.attr', 'type', 'text')
       cy.get('input[name="death date"]').should('have.attr', 'type', 'date')
       cy.get('input[name="email"]').should('have.attr', 'type', 'email')
       cy.get('input[name="phone"]').should('have.attr', 'type', 'tel')
@@ -63,6 +64,24 @@ describe('Whole family tree (big-tree overview)', () => {
   it('renders the whole tree and is reachable from the rail', () => {
     // on the big-tree page the rail link flips to "Back to the builder"
     cy.get('.f3-gallery-rail-btn[title="Back to the builder"]').should('exist')
+  })
+
+  it('shows every person at once (all 13 of the sample family)', () => {
+    cy.wait(1200)
+    cy.get('.card_cont').should('have.length.at.least', 13)
+    cy.contains('#bt-count', 'Showing all 13').should('exist')
+  })
+
+  it('can re-focus then restore the whole tree with "Show everyone"', () => {
+    cy.wait(1200)
+    // focusing a leaf person renders fewer people...
+    cy.contains('.card-label div', 'Carla').click()
+    cy.wait(800)
+    cy.get('#bt-count').should('not.contain', 'Showing all 13')
+    // ...and "Show everyone" brings them all back
+    cy.get('#bt-show-all').click()
+    cy.wait(800)
+    cy.contains('#bt-count', 'Showing all 13').should('exist')
   })
 
   it('can search for a person', () => {
