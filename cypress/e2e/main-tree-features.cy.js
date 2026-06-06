@@ -106,3 +106,45 @@ describe('Rail navigation', () => {
     cy.get('.card_cont').should('have.length.at.least', 6)
   })
 })
+
+describe('Child ordering (oldest on the left)', () => {
+  // children listed in array order Mike(1990), Zara(1985), Anna(1995);
+  // by birthday the left-to-right order should be Zara, Mike, Anna.
+  const family = [
+    { id: 'p1', data: { gender: 'M', 'first name': 'Dad' }, rels: { spouses: ['p2'], children: ['c1', 'c2', 'c3'] } },
+    { id: 'p2', data: { gender: 'F', 'first name': 'Mom' }, rels: { spouses: ['p1'], children: ['c1', 'c2', 'c3'] } },
+    { id: 'c1', data: { gender: 'M', 'first name': 'Mike', birthday: '1990' }, rels: { parents: ['p1', 'p2'] } },
+    { id: 'c2', data: { gender: 'F', 'first name': 'Zara', birthday: '1985' }, rels: { parents: ['p1', 'p2'] } },
+    { id: 'c3', data: { gender: 'F', 'first name': 'Anna', birthday: '1995' }, rels: { parents: ['p1', 'p2'] } },
+  ]
+
+  function childOrder() {
+    return cy.get('.card_cont').then(($conts) => {
+      return [...$conts]
+        .map((c) => ({
+          name: ((c.querySelector('.card-label div') || {}).textContent || '').trim(),
+          left: c.getBoundingClientRect().left,
+        }))
+        .filter((k) => ['Mike', 'Zara', 'Anna'].includes(k.name))
+        .sort((a, b) => a.left - b.left)
+        .map((k) => k.name)
+    })
+  }
+
+  it('orders children oldest-first left-to-right in the builder', () => {
+    cy.intercept('GET', '/api/tree', family)
+    cy.intercept('PUT', '/api/tree', { statusCode: 200, body: { ok: true } })
+    cy.visit(BASE + '/examples/create-tree.html')
+    cy.get('.card_cont').should('have.length.at.least', 5)
+    cy.wait(1500)
+    childOrder().should('deep.equal', ['Zara', 'Mike', 'Anna'])
+  })
+
+  it('orders children oldest-first in the whole-tree overview', () => {
+    cy.intercept('GET', '/api/tree', family)
+    cy.visit(BASE + '/examples/big-tree.html')
+    cy.get('.card_cont').should('have.length.at.least', 5)
+    cy.wait(1500)
+    childOrder().should('deep.equal', ['Zara', 'Mike', 'Anna'])
+  })
+})

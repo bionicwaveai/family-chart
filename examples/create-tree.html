@@ -109,11 +109,32 @@ const FIELDS = [
 
 let f3Chart, f3Card, f3EditTree
 
+// Order siblings left-to-right so the oldest child is on the left.
+// Children with no/unparseable birthday sort to the right.
+function oldestChildFirst(a, b) {
+  const ta = birthValue(a.data), tb = birthValue(b.data)
+  if (ta === null && tb === null) return 0
+  if (ta === null) return 1
+  if (tb === null) return -1
+  return ta - tb
+}
+function birthValue(p) {
+  const raw = p && (p['birthday'] || p['birth date'])
+  if (raw == null || String(raw).trim() === '') return null
+  const s = String(raw).trim()
+  let t = Date.parse(s)                       // handles "1990", "1990-05-01", "05/01/1990", ...
+  if (!isNaN(t)) return t
+  const m = s.match(/\d{4}/)                  // fall back to a 4-digit year (e.g. "circa 1850")
+  if (m) { t = Date.parse(m[0] + '-01-01'); if (!isNaN(t)) return t }
+  return null
+}
+
 function create(data) {
   f3Chart = f3.createChart('#FamilyChart', data)
     .setTransitionTime(1000)
     .setCardXSpacing(250)
     .setCardYSpacing(150)
+    .setSortChildrenFunction(oldestChildFirst)   // oldest child on the left
 
   f3Card = f3Chart.setCardHtml()
     .setCardDisplay([["first name", "last name"], ["birthday"]])
