@@ -4,18 +4,39 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>v2/17-edit-tree</title>
+  <title>Family Tree Builder</title>
   <link rel="shortcut icon" type="image/svg" href="/examples/logo.svg">
   <script src="https://unpkg.com/d3@7"></script>
   <link rel="stylesheet" href="/src/styles/family-chart.css">
-  <style> body { font-family: 'Arial', sans-serif; } </style>
+  <style>
+    body { font-family: 'Arial', sans-serif; }
+
+    /* hover action buttons on each card (from v2/8-custom-elements-and-actions) */
+    .f3 .f3-card-action {
+      cursor: pointer; width: 22px; height: 22px; position: absolute; top: 2px;
+      border-radius: 50%; opacity: 0; transition: opacity .15s ease, background .15s ease;
+      display: flex; align-items: center; justify-content: center; color: #fff;
+    }
+    .f3 .card-inner:hover .f3-card-action { opacity: 0.85; }
+    .f3 .f3-card-action:hover { opacity: 1; background: rgba(0,0,0,0.35); }
+    .f3 .f3-card-action svg { width: 16px; height: 16px; padding: 0; }
+    .f3 .f3-card-action-edit { right: 4px; }
+    .f3 .f3-card-action-add { right: 30px; }
+
+    /* live profile-photo preview injected into the edit form (from v2/19) */
+    .f3-avatar-preview { display: flex; justify-content: center; margin: 4px 0 8px; }
+    .f3-avatar-preview img {
+      width: 92px; height: 92px; border-radius: 50%; object-fit: cover;
+      border: 2px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.06);
+    }
+  </style>
 </head>
 <body>
 <div id="FamilyChart" class="f3" style="width:100%;height:900px;margin:auto;background-color:rgb(33,33,33);color:#fff;"></div>
 <script type="module">
 import f3 from '../src/index.js'
 
-// list of all example. delete this if not needed
+// list of all examples. delete this if not needed
 import sidebar from './sidebar.js'
 sidebar()
 
@@ -51,28 +72,146 @@ function saveData(getData) {
   }, 600)
 }
 
+// Rich custom fields (from v2/19-family-tree-custom-fields). "birthday" and
+// "avatar" are kept as-is for backwards compatibility with existing saved data.
+const spouseLabel = (spouse) => [spouse.data['first name'], spouse.data['last name']].filter(Boolean).join(' ') || 'Spouse'
+const FIELDS = [
+  { type: 'text',     id: 'first name',  label: 'First Name' },
+  { type: 'text',     id: 'last name',   label: 'Last Name' },
+  { type: 'text',     id: 'maiden name', label: 'Maiden Name' },
+  { type: 'url',      id: 'avatar',      label: 'Profile Photo (URL)' },
+  { type: 'text',     id: 'birthday',    label: 'Birthday' },
+  { type: 'text',     id: 'birth place', label: 'Birth Place' },
+  { type: 'date',     id: 'death date',  label: 'Death Date' },
+  { type: 'rel_reference', rel_type: 'spouse', input_type: 'date', id: 'marriage date', label: 'Marriage Date', getRelLabel: spouseLabel },
+  { type: 'rel_reference', rel_type: 'spouse', input_type: 'date', id: 'divorce date',  label: 'Divorce Date',  getRelLabel: spouseLabel },
+  { type: 'text',     id: 'occupation',  label: 'Occupation' },
+  { type: 'textarea', id: 'bio',         label: 'Biography' },
+  { type: 'url',      id: 'website',     label: 'Website' },
+  { type: 'url',      id: 'instagram',   label: 'Instagram' },
+  { type: 'url',      id: 'twitter',     label: 'X / Twitter' },
+  { type: 'url',      id: 'facebook',    label: 'Facebook' },
+  { type: 'url',      id: 'linkedin',    label: 'LinkedIn' },
+  { type: 'email',    id: 'email',       label: 'Email' },
+  { type: 'tel',      id: 'phone',       label: 'Phone' },
+]
+
+let f3Chart, f3Card, f3EditTree
+
 function create(data) {
-  const f3Chart = f3.createChart('#FamilyChart', data)
+  f3Chart = f3.createChart('#FamilyChart', data)
     .setTransitionTime(1000)
     .setCardXSpacing(250)
     .setCardYSpacing(150)
 
-  const f3Card = f3Chart.setCard(f3.CardHtml)
-    .setCardDisplay([["first name","last name"],["birthday"]])
+  f3Card = f3Chart.setCardHtml()
+    .setCardDisplay([["first name", "last name"], ["birthday"]])
+    .setDefaultPersonIcon((d) => initialsAvatar(d.data.data || d.data))
+    .setOnCardUpdate(onCardUpdate)
 
-  const f3EditTree = f3Chart.editTree()
-    .setFields(["first name","last name","birthday", "avatar"])
-    .setEditFirst(true)  // true = open form on click, false = open info in click
+  f3EditTree = f3Chart.editTree()
+    .setFields(FIELDS)
+    .setEditFirst(true)              // open the form ready to edit on card click
     .setCardClickOpen(f3Card)
     .setOnChange(() => saveData(() => f3EditTree.exportData()))
-    // .setNoEdit()  // if you want to just see info form
+    .setOnFormCreation(addAvatarPreview)
 
   f3Chart.updateTree({initial: true})
   f3EditTree.open(f3Chart.getMainDatum())
   f3Chart.updateTree({initial: true})
 }
 
-</script>
+// Runs on every card render. Combines:
+//  - a custom text label that shows the birthday (from v2/5-custom-text-display)
+//  - hover edit/add action buttons (from v2/8-custom-elements-and-actions)
+function onCardUpdate(d) {
+  const p = d.data.data
 
+  // custom label text: name + birthday (keep the inner <div>s so selectors that
+  // target `.card-label div` keep working)
+  const card_label = this.querySelector('.card-label')
+  if (card_label && !d.data._new_rel_data) {
+    const name = [p['first name'], p['last name']].filter(Boolean).join(' ')
+    const bday = p['birthday'] ? `<div style="font-size:11px;opacity:.7;">b. ${esc(p['birthday'])}</div>` : ''
+    card_label.innerHTML = `<div>${esc(name)}</div>` + bday
+  }
+
+  // hover action buttons (not on placeholder cards or while removing a relative)
+  if (d.data._new_rel_data) return
+  if (f3EditTree.isRemovingRelative()) return
+
+  const card_inner = this.querySelector('.card-inner')
+  if (!card_inner) return
+
+  addActionButton(card_inner, 'f3-card-action-edit', f3.icons.userEditSvgIcon(), 'Edit', (e) => {
+    e.stopPropagation()
+    f3EditTree.open(d.data)
+    f3Card.onCardClickDefault(e, d)
+  })
+
+  addActionButton(card_inner, 'f3-card-action-add', f3.icons.userPlusSvgIcon(), 'Add relative', (e) => {
+    e.stopPropagation()
+    if (f3EditTree.isAddingRelative()) f3EditTree.addRelativeInstance.onCancel()
+    f3EditTree.open(d.data)
+    f3Card.onCardClickDefault(e, d)
+    const add_btn = document.querySelector('.f3-add-relative-btn')
+    if (add_btn) add_btn.click()
+  })
+}
+
+function addActionButton(card_inner, cls, icon_html, title, onClick) {
+  const btn = document.createElement('div')
+  btn.className = 'f3-card-action ' + cls
+  btn.title = title
+  btn.innerHTML = icon_html
+  btn.addEventListener('click', onClick)
+  card_inner.appendChild(btn)
+}
+
+// Live profile-photo preview added to the top of the edit form (from v2/19).
+function addAvatarPreview({ cont, form_creator }) {
+  if (!form_creator.editable) return
+  const input = cont.querySelector('input[name="avatar"]')
+  if (!input) return
+  const preview = document.createElement('div')
+  preview.className = 'f3-avatar-preview'
+  const img = document.createElement('img')
+  preview.appendChild(img)
+  input.closest('.f3-form-field').before(preview)
+
+  const render = () => {
+    const url = input.value.trim()
+    if (url) { img.src = url; preview.style.display = 'flex' }
+    else { preview.style.display = 'none' }
+  }
+  img.addEventListener('error', () => { preview.style.display = 'none' })
+  input.addEventListener('input', render)
+  render()
+}
+
+// Generated initials avatar shown when a person has no profile photo.
+function initialsAvatar(p) {
+  const fn = (p['first name'] || '').trim(), ln = (p['last name'] || '').trim()
+  const initials = ((fn[0] || '') + (ln[0] || '')).toUpperCase() || '?'
+  const colors = p.gender === 'F' ? ['#f06292', '#ba68c8']
+    : p.gender === 'M' ? ['#4fc3f7', '#5c6bc0'] : ['#90a4ae', '#607d8b']
+  const id = 'g' + Math.random().toString(36).slice(2, 8)
+  return `
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="${colors[0]}"/><stop offset="1" stop-color="${colors[1]}"/>
+      </linearGradient></defs>
+      <rect width="100" height="100" fill="url(#${id})"/>
+      <text x="50" y="50" dy="0.35em" text-anchor="middle" fill="#fff"
+        font-family="Arial, sans-serif" font-size="38" font-weight="700">${initials}</text>
+    </svg>`
+}
+
+function esc(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+</script>
 </body>
 </html>

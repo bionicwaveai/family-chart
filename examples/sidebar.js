@@ -183,6 +183,30 @@ export default function () {
     rail_buttons[menu.id] = btn
   })
 
+  // Standalone rail links that navigate (rather than open a panel), rendered
+  // below the menu icons. The "Whole tree" link is context-aware: on the
+  // big-tree page it switches back to the builder. Add more links here later.
+  const links = [
+    {
+      title: 'See the whole tree',
+      icon: GALLERY_ICONS.tree,
+      href: '/examples/big-tree.html',
+      active_title: 'Back to the builder',
+      active_href: '/examples/create-tree.html',
+      isActive: (path) => path.indexOf('big-tree') !== -1,
+    },
+  ]
+  links.forEach(link => {
+    const is_active = link.isActive(location.pathname)
+    const btn = document.createElement('button')
+    btn.className = 'f3-gallery-rail-btn' + (is_active ? ' active' : '')
+    btn.title = is_active ? link.active_title : link.title
+    btn.setAttribute('aria-label', btn.title)
+    btn.innerHTML = link.icon
+    btn.addEventListener('click', () => { window.location.href = is_active ? link.active_href : link.href })
+    rail.appendChild(btn)
+  })
+
   update()
 
   function toggle(id) {
@@ -231,6 +255,7 @@ export default function () {
 
 const GALLERY_ICONS = {
   list: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>',
+  tree: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="5" rx="1"/><rect x="2" y="16" width="6" height="5" rx="1"/><rect x="16" y="16" width="6" height="5" rx="1"/><path d="M12 8v6M5 16v-2h14v2"/></svg>',
 }
 
 function injectGalleryStyles() {
