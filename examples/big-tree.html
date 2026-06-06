@@ -83,6 +83,7 @@ function create(data) {
     .setCardXSpacing(210)
     .setCardYSpacing(140)
     .setShowSiblingsOfMain(true)
+    .setSortChildrenFunction(oldestChildFirst)   // oldest child on the left
     .setAfterUpdate(updateCount)
 
   const f3Card = f3Chart.setCardHtml()
@@ -199,6 +200,26 @@ function bestMainId(data) {
     if (n > bestN) { bestN = n; best = d.id }
   }
   return best
+}
+
+// Order siblings left-to-right so the oldest child is on the left.
+// Children with no/unparseable birthday sort to the right.
+function oldestChildFirst(a, b) {
+  const ta = birthValue(a.data), tb = birthValue(b.data)
+  if (ta === null && tb === null) return 0
+  if (ta === null) return 1
+  if (tb === null) return -1
+  return ta - tb
+}
+function birthValue(p) {
+  const raw = p && (p['birthday'] || p['birth date'])
+  if (raw == null || String(raw).trim() === '') return null
+  const s = String(raw).trim()
+  let t = Date.parse(s)
+  if (!isNaN(t)) return t
+  const m = s.match(/\d{4}/)
+  if (m) { t = Date.parse(m[0] + '-01-01'); if (!isNaN(t)) return t }
+  return null
 }
 
 function initialsAvatar(p) {
