@@ -1,0 +1,1 @@
+- [Express 5 wildcard routes](express5-routing.md) — Express 5 rejects bare `'*'` route; use `express.static` or `/*splat`, not `app.get('*')`.

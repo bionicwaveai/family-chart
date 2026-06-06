@@ -42,21 +42,27 @@
   ],
   "scripts": {
     "build": "node build.js",
+    "build:site": "vite build",
     "test": "cypress open",
     "test-run": "cypress run",
-    "dev": "vite",
+    "dev": "concurrently -k -n server,vite -c blue,green \"node server/index.js\" \"vite\"",
+    "server": "node server/index.js",
+    "start": "NODE_ENV=production node server/index.js",
     "docs": "typedoc",
     "docs:deploy": "yarn docs && gh-pages -d docs/api -b gh-pages",
     "prepublishOnly": "node prePublish.js"
   },
   "sideEffects": false,
   "dependencies": {
-    "d3": "^7.9.0"
+    "d3": "^7.9.0",
+    "express": "^5.2.1",
+    "pg": "^8.21.0"
   },
   "devDependencies": {
     "@rollup/plugin-terser": "^0.4.4",
     "@rollup/plugin-typescript": "^12.1.4",
     "@types/d3": "^7.4.3",
+    "concurrently": "^10.0.3",
     "cypress": "15.2.0",
     "gh-pages": "^6.3.0",
     "http-server": "^14.1.1",

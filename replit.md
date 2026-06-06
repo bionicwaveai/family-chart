@@ -10,11 +10,19 @@ A D3.js-based JavaScript library for creating beautiful, interactive family tree
 - **Source**: `src/` (core, layout, renderers, store, handlers, features, styles).
 - **Examples**: `examples/` — HTML demos that import directly from `src/`. They fetch sample data from `examples/data/` (and some from a remote doc host).
 
+## Persistence (shared family tree)
+
+- **Database**: Replit-managed PostgreSQL. Single table `family_tree` holds one shared tree as a JSONB document (constrained to a single row, `id = 1`).
+- **Backend**: `server/index.js` — small Express API. `GET /api/tree` returns the saved tree (or the `examples/data/data-first-node.json` default if nothing saved yet); `PUT /api/tree` replaces it. Reads `DATABASE_URL` from the environment.
+- **Frontend**: `examples/create-tree.html` (the visual builder everyone lands on) loads from `/api/tree` on startup and autosaves the full dataset (debounced 600ms) via the library's `setOnChange`/`exportData` on every add/edit/remove. Other example pages are unchanged (read-only demos).
+- Single shared tree, last write wins. No auth, no per-user trees, no live multi-user sync (changes appear on next reload).
+
 ## Replit Setup
 
-- **Workflow** "Start application": `yarn dev` (Vite) on port 5000, host `0.0.0.0`.
+- **Workflow** "Start application": `yarn dev` → runs the Express API (localhost:3001) and Vite (port 5000, host `0.0.0.0`) together via `concurrently`. Vite proxies `/api` → `http://localhost:3001`.
 - Vite `server.allowedHosts: true` so the Replit preview proxy/iframe works.
-- **Deployment**: static target. Build runs `npx vite build` which bundles the root page and every `examples/**/*.html` entry into `dist/`, then a Vite plugin copies `examples/data` into `dist/examples/data` so runtime `fetch()` of local sample data works in production. `publicDir` = `dist`.
+- **Deployment**: autoscale target. Build runs `npx vite build` which bundles the root page and every `examples/**/*.html` entry into `dist/` (a Vite plugin copies `examples/data` into `dist/examples/data` for runtime `fetch()` of sample data). Run command is `npm run start` (`NODE_ENV=production node server/index.js`), which serves the built `dist/` static files and the `/api` endpoints together on port 5000 (binds `0.0.0.0` in production).
+- Library build (`node build.js` → Rollup) is unchanged and independent of the demo site/server.
 
 ## User Preferences
 

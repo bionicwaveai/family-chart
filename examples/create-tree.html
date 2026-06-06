@@ -19,10 +19,37 @@ import f3 from '../src/index.js'
 import sidebar from './sidebar.js'
 sidebar()
 
-fetch('./data/data-first-node.json')
-  .then(res => res.json())
-  .then(data => create(data))
-  .catch(err => console.error(err))
+// Load the shared, saved family tree from the backend. Falls back to the
+// default first-node sample if the API is unavailable.
+fetch('/api/tree')
+  .then(res => {
+    if (!res.ok) throw new Error('API returned ' + res.status)
+    return res.json()
+  })
+  .then(data => {
+    if (!Array.isArray(data) || data.length === 0) throw new Error('No saved data')
+    create(data)
+  })
+  .catch(err => {
+    console.error('Failed to load saved tree, using default:', err)
+    fetch('./data/data-first-node.json')
+      .then(res => res.json())
+      .then(data => create(data))
+      .catch(err2 => console.error(err2))
+  })
+
+// Save the full dataset to the backend, debounced so rapid edits coalesce.
+let saveTimer = null
+function saveData(getData) {
+  clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    fetch('/api/tree', {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(getData())
+    }).catch(err => console.error('Failed to save tree:', err))
+  }, 600)
+}
 
 function create(data) {
   const f3Chart = f3.createChart('#FamilyChart', data)
@@ -37,6 +64,7 @@ function create(data) {
     .setFields(["first name","last name","birthday", "avatar"])
     .setEditFirst(true)  // true = open form on click, false = open info in click
     .setCardClickOpen(f3Card)
+    .setOnChange(() => saveData(() => f3EditTree.exportData()))
     // .setNoEdit()  // if you want to just see info form
 
   f3Chart.updateTree({initial: true})
