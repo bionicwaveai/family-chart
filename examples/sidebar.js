@@ -128,6 +128,10 @@ export default function () {
   [
     "v2/18-edit-tree-get-data-on-change",
     "/examples/htmls/v2/18-edit-tree-get-data-on-change"
+  ],
+  [
+    "v2/19-family-tree-custom-fields",
+    "/examples/htmls/v2/19-family-tree-custom-fields"
   ]
 ]
 

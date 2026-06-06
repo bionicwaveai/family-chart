@@ -92,6 +92,69 @@ You can add any custom properties to the `data` object. Common examples include:
 }
 ```
 
+## Editable Field Types
+
+When you enable editing with `chart.editTree()`, you control which fields appear
+in the add/edit form via `setFields`. Each field can be a simple string (rendered
+as a text input) or an object with an explicit `type`:
+
+```javascript
+const f3EditTree = f3Chart.editTree()
+  .setFields([
+    "first name",                                              // string shorthand → text input
+    { type: "url",      id: "avatar",     label: "Profile Photo (URL)" },
+    { type: "date",     id: "birth date", label: "Birth Date" },
+    { type: "date",     id: "death date", label: "Death Date" },
+    { type: "textarea", id: "bio",        label: "Biography" },
+    { type: "url",      id: "instagram",  label: "Instagram" },
+    { type: "email",    id: "email",      label: "Email" },
+    { type: "select",   id: "status",     label: "Status",
+      options: [{value: "living", label: "Living"}, {value: "deceased", label: "Deceased"}] },
+  ])
+```
+
+### Supported types
+
+| Type | Renders as | Notes |
+| --- | --- | --- |
+| `text` | text input | default for string fields |
+| `textarea` | multi-line textarea | good for notes / biography |
+| `date` | native date picker | e.g. birth date, death date |
+| `month` | month picker | |
+| `number` | numeric input | |
+| `tel` | phone input | clickable (`tel:`) in read-only view |
+| `email` | email input | clickable (`mailto:`) in read-only view |
+| `url` | url input | clickable link in read-only view — ideal for social media / website |
+| `password` | password input | |
+| `color` | color picker | |
+| `select` | dropdown | requires `options` (or `optionCreator`) |
+| `rel_reference` | per-spouse input | a value stored on the relationship, kept in sync on both spouses |
+
+Any unrecognised `type` falls back to a plain text input, so existing
+configurations keep working.
+
+### Relationship fields (marriage / divorce dates)
+
+Some values belong to a *relationship* rather than a single person — for example a
+marriage or divorce date. Use a `rel_reference` field; it shows one input per
+spouse and writes the value to both partners automatically. Add `input_type` to
+control the input (e.g. a date picker):
+
+```javascript
+{
+  type: "rel_reference",
+  rel_type: "spouse",
+  input_type: "date",                 // render the value as a date picker
+  id: "marriage date",
+  label: "Marriage Date",
+  getRelLabel: (spouse) => `${spouse.data["first name"]} ${spouse.data["last name"]}`,
+}
+```
+
+> See the **[19-family-tree-custom-fields](../examples/htmls/v2/19-family-tree-custom-fields.html)**
+> example for a complete tree using profile photos, birth/death dates,
+> marriage/divorce dates, social links, and localStorage persistence.
+
 ## Data Validation
 
 Family Chart will validate your data and show warnings for:

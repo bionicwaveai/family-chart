@@ -63,6 +63,22 @@ export interface NewRelFormCreator extends BaseFormCreator {
 
 export type FormCreator = EditDatumFormCreator | NewRelFormCreator;
 
+/**
+ * Native input types supported by the default form renderer.
+ * Any of these can be used as a field `type` in `EditTree.setFields`,
+ * e.g. `{type: 'date', id: 'birth date', label: 'Birth Date'}`.
+ */
+export type NativeInputType =
+  | 'text'
+  | 'date'
+  | 'month'
+  | 'number'
+  | 'tel'
+  | 'email'
+  | 'url'
+  | 'password'
+  | 'color'
+
 export interface Field {
   id: string;
   type: string;
@@ -76,6 +92,7 @@ export interface RelReferenceField extends Field {
   rel_id: string;
   rel_label: string;
   rel_type: 'spouse';
+  input_type?: NativeInputType;
 }
 
 export interface RelReferenceFieldCreator {
@@ -83,6 +100,8 @@ export interface RelReferenceFieldCreator {
   id: string;
   label: string;
   getRelLabel: (datum: Datum) => string;
+  /** Native input type used for the rel-reference value (defaults to 'text'). Useful for e.g. marriage/divorce dates. */
+  input_type?: NativeInputType;
 }
 
 export interface SelectField extends Field {
