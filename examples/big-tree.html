@@ -16,9 +16,15 @@
       background: rgba(20,20,20,0.9); color: #fff; border: 1px solid rgba(255,255,255,0.15);
       border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.4);
     }
+    .bt-btn {
+      cursor: pointer; font-size: 13px; padding: 5px 12px; border-radius: 5px; border: none;
+      background: #4CAF50; color: #fff;
+    }
+    .bt-btn:hover { filter: brightness(1.1); }
+    .bt-count { opacity: 0.8; }
     .bt-search { position: relative; }
     .bt-search input {
-      width: 200px; padding: 5px 8px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.2);
+      width: 180px; padding: 5px 8px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.2);
       background: rgb(33,33,33); color: #fff;
     }
     .bt-dropdown {
@@ -32,7 +38,9 @@
 <body>
 <div class="bt-toolbar">
   <strong>🌳 Whole Family Tree</strong>
-  <span style="opacity:.7;">Click a person to center · search to find</span>
+  <span id="bt-count" class="bt-count"></span>
+  <button id="bt-show-all" class="bt-btn">⤢ Show everyone</button>
+  <span style="opacity:.6;">Click a person to focus · search to find</span>
   <div class="bt-search">
     <input id="bt-search-input" type="text" placeholder="Search by name" autocomplete="off">
     <div id="bt-dropdown" class="bt-dropdown" style="display:none;"></div>
@@ -64,10 +72,18 @@ fetch('/api/tree')
   })
 
 function create(data) {
+  // The tree is drawn around a single "main" person: their ancestors, all their
+  // descendants, and spouses. To show as many people as possible at once we
+  // center on the person whose family fans out to cover the most of the tree,
+  // and turn on sibling display.
+  const main_id = bestMainId(data)
+
   const f3Chart = f3.createChart('#FamilyChart', data)
     .setTransitionTime(800)
     .setCardXSpacing(210)
     .setCardYSpacing(140)
+    .setShowSiblingsOfMain(true)
+    .setAfterUpdate(updateCount)
 
   const f3Card = f3Chart.setCardHtml()
     .setCardDisplay([["first name", "last name"]])
@@ -83,15 +99,37 @@ function create(data) {
       card_label.innerHTML = `<div>${esc(name)}</div>` + bday
     })
 
-  // click a person to re-center the whole tree on them
+  // click a person to focus the tree on them (explore their branch)
   f3Card.setOnCardClick((e, d) => centerOn(d.data.id))
 
-  // initial render fits the entire tree to the screen so you see everyone at once
-  f3Chart.updateTree({ initial: true })
+  // initial render: everyone, fit to the screen
+  showEveryone()
 
   function centerOn(person_id) {
     f3Chart.updateMainId(person_id)
     f3Chart.updateTree({})
+  }
+
+  function showEveryone() {
+    f3Chart.updateMainId(main_id)
+    f3Chart.updateTree({ initial: true })
+  }
+
+  document.querySelector('#bt-show-all').addEventListener('click', showEveryone)
+
+  // honest indicator of how many of the total people are currently visible
+  function updateCount() {
+    const tree = f3Chart.store.getTree && f3Chart.store.getTree()
+    const el = document.querySelector('#bt-count')
+    if (!tree || !el) return
+    const ids = new Set()
+    tree.data.forEach(td => {
+      const d = td.data
+      if (d && !d.to_add && !d._new_rel_data) ids.add(d.id)
+    })
+    el.textContent = ids.size >= data.length
+      ? `Showing all ${data.length}`
+      : `Showing ${ids.size} of ${data.length} (click “Show everyone”)`
   }
 
   // ---- search dropdown (adapted from v2/10-big-tree) ----
@@ -120,6 +158,47 @@ function create(data) {
     })
     dropdown.style.display = filtered.length ? 'block' : 'none'
   }
+}
+
+// Pick the person who, when used as the tree's center, renders the most people:
+// their ancestors + all descendants + spouses + their own siblings. A deep
+// descendant whose parents both have lineage in the tree usually wins, pulling
+// every founding line into one view.
+function bestMainId(data) {
+  const byId = new Map(data.map(d => [d.id, d]))
+  const rel = (id, key) => (byId.get(id) && byId.get(id).rels && byId.get(id).rels[key]) || []
+
+  function coverage(mainId) {
+    const set = new Set([mainId])
+    // all descendants (down)
+    const seenDown = new Set([mainId])
+    const downStack = [mainId]
+    while (downStack.length) {
+      const id = downStack.pop()
+      rel(id, 'children').forEach(c => { if (!seenDown.has(c)) { seenDown.add(c); downStack.push(c); set.add(c) } })
+    }
+    // all ancestors (up) — both parents at each level
+    const seenUp = new Set()
+    const upStack = [...rel(mainId, 'parents')]
+    while (upStack.length) {
+      const id = upStack.pop()
+      if (seenUp.has(id)) continue
+      seenUp.add(id); set.add(id)
+      rel(id, 'parents').forEach(p => upStack.push(p))
+    }
+    // spouses of the main person and of every descendant
+    seenDown.forEach(id => rel(id, 'spouses').forEach(s => set.add(s)))
+    // the main person's siblings (other children of their parents)
+    rel(mainId, 'parents').forEach(pid => rel(pid, 'children').forEach(c => set.add(c)))
+    return set.size
+  }
+
+  let best = data[0].id, bestN = -1
+  for (const d of data) {
+    const n = coverage(d.id)
+    if (n > bestN) { bestN = n; best = d.id }
+  }
+  return best
 }
 
 function initialsAvatar(p) {
