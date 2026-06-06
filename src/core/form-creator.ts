@@ -89,6 +89,7 @@ export function formCreatorSetup({
       id: field.id,
       type: field.type,
       label: field.label,
+      placeholder: field.placeholder,
       initial_value: datum.data[field.id],
     })
   })
@@ -122,6 +123,7 @@ export function formCreatorSetup({
           rel_label: field.getRelLabel(spouse),
           initial_value: datum.data[marriage_date_id],
           rel_type: field.rel_type,
+          input_type: field.input_type || 'text',
         }
         form_creator.fields.push(rel_reference_field)
       })

@@ -107,7 +107,7 @@
 
 
 /* form-info */
-.f3-form input[type="text"],
+.f3-form input:not([type="radio"]):not([type="checkbox"]),
 .f3-form textarea,
 .f3-form select {
   width: 100%;
@@ -121,10 +121,33 @@
   color: currentColor;
 }
 
-.f3-form input[type="text"]:focus,
+.f3-form input:not([type="radio"]):not([type="checkbox"]):focus,
 .f3-form textarea:focus,
 .f3-form select:focus {
   box-shadow: 0 0 5px rgba(76, 175, 80, 0.2);
+}
+
+/* render native date/color pickers legibly on dark card backgrounds */
+.f3-form input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
+  cursor: pointer;
+}
+
+.f3-form input[type="color"] {
+  height: 40px;
+  padding: 4px;
+  cursor: pointer;
+}
+
+/* clickable links in the read-only info view (e.g. social media / website fields) */
+.f3-info-field-value a {
+  color: #4CAF50;
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.f3-info-field-value a:hover {
+  text-decoration: underline;
 }
 
 .f3-form button {

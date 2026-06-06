@@ -35,6 +35,7 @@ describe('Examples', () => {
     { path: '/examples/v2/16-default-card-icons' },
     { path: '/examples/v2/17-edit-tree' },
     { path: '/examples/v2/18-edit-tree-get-data-on-change' },
+    { path: '/examples/v2/19-family-tree-custom-fields', card_n: 6 },
   ]
 
   before(() => {

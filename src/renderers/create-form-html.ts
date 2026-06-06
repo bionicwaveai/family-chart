@@ -105,44 +105,48 @@ function genderRadio(form_creator: EditDatumFormCreator | NewRelFormCreator) {
   `)
 }
 
+// Native HTML input types the default form renderer knows how to draw.
+// Any unrecognised type falls back to a plain text input.
+const NATIVE_INPUT_TYPES = ['text', 'date', 'month', 'number', 'tel', 'email', 'url', 'password', 'color']
+
 function fields(form_creator: EditDatumFormCreator | NewRelFormCreator) {
   if (!form_creator.editable) return infoField()
   let fields_html = ''
   form_creator.fields.forEach(field => {
-    if (field.type === 'text') {
+    if (field.type === 'textarea') {
       fields_html += `
       <div class="f3-form-field">
-        <label>${field.label}</label>
-        <input type="${field.type}" 
-          name="${field.id}" 
-          value="${field.initial_value || ''}"
-          placeholder="${field.label}">
-      </div>`
-    } else if (field.type === 'textarea') {
-      fields_html += `
-      <div class="f3-form-field">
-        <label>${field.label}</label>
-        <textarea name="${field.id}" 
-          placeholder="${field.label}">${field.initial_value || ''}</textarea>
+        <label>${esc(field.label)}</label>
+        <textarea name="${esc(field.id)}"
+          placeholder="${esc(field.placeholder || field.label)}">${esc(field.initial_value || '')}</textarea>
       </div>`
     } else if (field.type === 'select') {
       const select_field = field as SelectField
       fields_html += `
       <div class="f3-form-field">
-        <label>${select_field.label}</label>
-        <select name="${select_field.id}" value="${select_field.initial_value || ''}">
-          <option value="">${select_field.placeholder || `Select ${select_field.label}`}</option>
-          ${select_field.options.map((option) => `<option ${option.value === select_field.initial_value ? 'selected' : ''} value="${option.value}">${option.label}</option>`).join('')}
+        <label>${esc(select_field.label)}</label>
+        <select name="${esc(select_field.id)}">
+          <option value="">${esc(select_field.placeholder || `Select ${select_field.label}`)}</option>
+          ${select_field.options.map((option) => `<option ${option.value === select_field.initial_value ? 'selected' : ''} value="${esc(option.value)}">${esc(option.label)}</option>`).join('')}
         </select>
       </div>`
     } else if (field.type === 'rel_reference') {
       fields_html += `
       <div class="f3-form-field">
-        <label>${field.label} - <i>${field.rel_label}</i></label>
-        <input type="text" 
-          name="${field.id}" 
-          value="${field.initial_value || ''}"
-          placeholder="${field.label}">
+        <label>${esc(field.label)} - <i>${esc(field.rel_label)}</i></label>
+        <input type="${getInputType(field.input_type)}"
+          name="${esc(field.id)}"
+          value="${esc(field.initial_value || '')}"
+          placeholder="${esc(field.label)}">
+      </div>`
+    } else {
+      fields_html += `
+      <div class="f3-form-field">
+        <label>${esc(field.label)}</label>
+        <input type="${getInputType(field.type)}"
+          name="${esc(field.id)}"
+          value="${esc(field.initial_value || '')}"
+          placeholder="${esc(field.placeholder || field.label)}">
       </div>`
     }
   })
@@ -155,27 +159,57 @@ function fields(form_creator: EditDatumFormCreator | NewRelFormCreator) {
         if (!field.initial_value) return
         fields_html += `
         <div class="f3-info-field">
-          <span class="f3-info-field-label">${field.label} - <i>${field.rel_label}</i></span>
-          <span class="f3-info-field-value">${field.initial_value || ''}</span>
+          <span class="f3-info-field-label">${esc(field.label)} - <i>${esc(field.rel_label)}</i></span>
+          <span class="f3-info-field-value">${infoValue(field.input_type, field.initial_value)}</span>
         </div>`
       } else if (field.type === 'select') {
         const select_field = field as SelectField
         if (!field.initial_value) return
         fields_html += `
         <div class="f3-info-field">
-          <span class="f3-info-field-label">${select_field.label}</span>
-          <span class="f3-info-field-value">${select_field.options.find(option => option.value === select_field.initial_value)?.label || ''}</span>
+          <span class="f3-info-field-label">${esc(select_field.label)}</span>
+          <span class="f3-info-field-value">${esc(select_field.options.find(option => option.value === select_field.initial_value)?.label || '')}</span>
         </div>`
       } else {
         fields_html += `
         <div class="f3-info-field">
-          <span class="f3-info-field-label">${field.label}</span>
-          <span class="f3-info-field-value">${field.initial_value || ''}</span>
+          <span class="f3-info-field-label">${esc(field.label)}</span>
+          <span class="f3-info-field-value">${infoValue(field.type, field.initial_value)}</span>
         </div>`
       }
     })
     return fields_html
   }
+}
+
+// Returns a safe input type attribute, defaulting to 'text' for unknown types.
+function getInputType(type: string | undefined) {
+  return type && NATIVE_INPUT_TYPES.includes(type) ? type : 'text'
+}
+
+// Renders a read-only field value, turning url/email/tel fields into clickable links.
+function infoValue(type: string | undefined, value: any) {
+  if (value === undefined || value === null || value === '') return ''
+  const str = String(value)
+  if (type === 'url') {
+    const href = /^(https?:)?\/\//i.test(str) || str.startsWith('mailto:') ? str : `https://${str}`
+    return `<a href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(str)}</a>`
+  } else if (type === 'email') {
+    return `<a href="mailto:${esc(str)}">${esc(str)}</a>`
+  } else if (type === 'tel') {
+    return `<a href="tel:${esc(str)}">${esc(str)}</a>`
+  }
+  return esc(str)
+}
+
+// Escapes a value for safe interpolation into HTML text content or attribute values.
+function esc(str: any) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
 function addLinkExistingRelative(form_creator: EditDatumFormCreator | NewRelFormCreator) {
@@ -186,10 +220,10 @@ function addLinkExistingRelative(form_creator: EditDatumFormCreator | NewRelForm
     <div>
       <hr>
       <div class="f3-link-existing-relative">
-        <label>${title}</label>
+        <label>${esc(title)}</label>
         <select>
-          <option value="">${select_placeholder}</option>
-          ${options.map(option => `<option value="${option.value}">${option.label}</option>`).join('')}
+          <option value="">${esc(select_placeholder)}</option>
+          ${options.map(option => `<option value="${esc(option.value)}">${esc(option.label)}</option>`).join('')}
         </select>
       </div>
     </div>

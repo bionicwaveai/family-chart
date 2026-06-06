@@ -37,6 +37,11 @@ export default function CardHtml(props: {
     </div>
     `)
     this.querySelector('.card')!.addEventListener('click', (e: Event) => props.onCardClick(e, d))
+
+    // gracefully fall back to the default person icon if a profile photo fails to load
+    const card_image = this.querySelector('.card-inner img') as HTMLImageElement | null
+    if (card_image) card_image.addEventListener('error', () => { card_image.outerHTML = noImageIcon(d) })
+
     if (props.onCardUpdate) props.onCardUpdate.call(this, d)
 
     if (props.onCardMouseenter) d3.select(this).select('.card').on('mouseenter', e => props.onCardMouseenter!(e, d))
